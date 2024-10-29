@@ -1,6 +1,6 @@
 {
   "name": "@gallolabs/open-metrics",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Open metrics",
   "main": "dist/index.js",
   "scripts": {
