@@ -77,27 +77,27 @@ export class MetricsFormatter {
     }
 }
 
-export type MessageEvents = {
-    warning: (error: ServerError) => void
-    error: (error: ServerError) => void
+export type MetricsServerEvents = {
+    warning: (error: MetricsServerError) => void
+    error: (error: MetricsServerError) => void
     request: (request: FastifyRequest) => void
     response: (response: FastifyReply) => void
 }
 
-export interface ServerErrorDetails {
+export interface MetricsServerErrorDetails {
     request: FastifyRequest
 }
 
-export class ServerError extends Error {
+export class MetricsServerError extends Error {
     name = 'ServerError'
     request: FastifyRequest
-    constructor(message: string, options: ErrorOptions & ServerErrorDetails) {
+    constructor(message: string, options: ErrorOptions & MetricsServerErrorDetails) {
         super(message, {cause: options.cause})
         this.request = options.request
     }
 }
 
-export class MetricsServer extends (EventEmitter as new () => TypedEmitter<MessageEvents>) {
+export class MetricsServer extends (EventEmitter as new () => TypedEmitter<MetricsServerEvents>) {
     protected registry: MetricsRegistry
     protected formatter: MetricsFormatter
     protected server: FastifyInstance
@@ -122,7 +122,7 @@ export class MetricsServer extends (EventEmitter as new () => TypedEmitter<Messa
         })
 
         this.server.addHook('onError', async (request, __, error) => {
-            this.emit('error', new ServerError(error.message, {cause: error, request}))
+            this.emit('error', new MetricsServerError(error.message, {cause: error, request}))
         })
 
         this.server.addHook('onResponse', async (request, reply) => {
@@ -131,7 +131,7 @@ export class MetricsServer extends (EventEmitter as new () => TypedEmitter<Messa
             if (reply.elapsedTime > 1000) {
                 this.emit(
                     'warning',
-                    new ServerError(
+                    new MetricsServerError(
                         'Response too slow following OpenMetrics specs. Expected <= 1000ms, given '
                         + (reply.elapsedTime > 1001 ? Math.floor(reply.elapsedTime) : Math.ceil(reply.elapsedTime)).toString()
                         + 'ms',
