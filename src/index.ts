@@ -62,11 +62,15 @@ export class MetricsRegistry {
 }
 
 export class MetricsFormatter {
+    public getContentType() {
+        return openMetricsContentType
+    }
+
     public async format(registry: MetricsRegistry) {
         // Bad arch : Registry and dumper should not be the same
         const promRegistry = registry['promRegistry']
         // Cool ... Typescript is pooply implemented
-        promRegistry.setContentType(openMetricsContentType as any)
+        promRegistry.setContentType(this.getContentType() as any)
 
         return await promRegistry.metrics()
     }
@@ -76,14 +80,13 @@ export class MetricsServer extends EventEmitter {
     protected registry: MetricsRegistry
     protected formatter: MetricsFormatter
     protected server: FastifyInstance
+    protected port: number
 
-    public on('request', listener: (...args: any[]) => void): this {
-
-    }
+    //public on(eventName: 'request', listener: (...args: any[]) => void): this
 
     public constructor(
-        {registry, uidGenerator, formatter}:
-        {registry: MetricsRegistry, formatter: MetricsFormatter, uidGenerator?: () => string}
+        {registry, uidGenerator, formatter, port}:
+        {registry: MetricsRegistry, formatter: MetricsFormatter, uidGenerator?: () => string, port?: number}
     ) {
         super()
         this.registry = registry
@@ -91,13 +94,12 @@ export class MetricsServer extends EventEmitter {
         this.server = Fastify({
             genReqId: uidGenerator || (() => Math.random().toString(36).substring(2))
         })
+        this.port = port || 9090
 
         this.server.addHook('onRequest', async (request) => {
             this.emit('request', {
                 request
             })
-            // Todo add logs on fwk scope (.metrics)
-          //console.log(request.id, request.url, request)
         })
 
         this.server.addHook('onError', async (request,_, error) => {
@@ -124,7 +126,7 @@ export class MetricsServer extends EventEmitter {
                 )
             }
         })
-        this.server.get('/metrics', async (_, reply) => reply.type(openMetricsContentType).send(await this.formatter.format(this.registry)))
+        this.server.get('/metrics', async (_, reply) => reply.type(this.formatter.getContentType()).send(await this.formatter.format(this.registry)))
     }
 
     public async start(abortSignal?: AbortSignal) {
@@ -133,7 +135,7 @@ export class MetricsServer extends EventEmitter {
             throw new Error('Server already running')
         }
 
-        await this.server.listen({port: 9090, signal: abortSignal})
+        await this.server.listen({port: this.port, signal: abortSignal})
     }
 
     public async stop() {
