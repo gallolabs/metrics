@@ -1,5 +1,6 @@
 import assert from 'assert'
 import {MetricsRegistry, MetricsUserFriendlyInterface, MetricsServer, MetricsFormatter} from './index.js'
+import {setTimeout} from 'timers/promises'
 
 describe('open-metric', () => {
     it('test', async() => {
@@ -11,17 +12,21 @@ describe('open-metric', () => {
             registry: metricsRegistry
         })
 
-        // metricsServer.on('request', (request) => {
-        //     metricsLogger.debug('Request')
-        // })
+        metricsServer.on('request', (request) => {
+            console.log('Received request', request.id, request.url)
+        })
 
-        // metricsServer.on('response', (request, response) => {
+        metricsServer.on('response', (response) => {
+            console.log('Returned response', response.request.id)
+        })
 
-        // })
+        metricsServer.on('error', (error) => {
+            console.log('Errorrr !!!', error)
+        })
 
-        // metricsServer.on('error', (request, response) => {
-
-        // })
+        metricsServer.on('warning', (warning) => {
+            console.log('Warning !', warning.message, warning.request.id)
+        })
 
         const abortController = new AbortController
         await metricsServer.start(abortController.signal)
@@ -37,7 +42,10 @@ describe('open-metric', () => {
         metrics.createGauge({
             help: 'Random value',
             name: 'random',
-            collect() {
+            async collect() {
+                if (randomI === 1) {
+                    await setTimeout(1000)
+                }
                 this.set(randoms[randomI++])
             }
         })

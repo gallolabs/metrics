@@ -5,8 +5,9 @@ import {
     Counter, CounterConfiguration, Gauge, GaugeConfiguration, Histogram, HistogramConfiguration,
     Metric, Registry as PromRegistry, Summary, SummaryConfiguration, openMetricsContentType
 } from 'prom-client'
-import Fastify, { FastifyInstance } from 'fastify'
+import Fastify, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import EventEmitter from 'events'
+import { TypedEmitter } from 'tiny-typed-emitter'
 
 export type CounterOpts = Omit<CounterConfiguration<any>, 'registers' | 'aggregator'>
 export type GaugeOpts = Omit<GaugeConfiguration<any>, 'registers' | 'aggregator'>
@@ -76,7 +77,27 @@ export class MetricsFormatter {
     }
 }
 
-export class MetricsServer extends EventEmitter {
+export type MessageEvents = {
+    warning: (error: ServerError) => void
+    error: (error: ServerError) => void
+    request: (request: FastifyRequest) => void
+    response: (response: FastifyReply) => void
+}
+
+export interface ServerErrorDetails {
+    request: FastifyRequest
+}
+
+export class ServerError extends Error {
+    name = 'ServerError'
+    request: FastifyRequest
+    constructor(message: string, options: ErrorOptions & ServerErrorDetails) {
+        super(message, {cause: options.cause})
+        this.request = options.request
+    }
+}
+
+export class MetricsServer extends (EventEmitter as new () => TypedEmitter<MessageEvents>) {
     protected registry: MetricsRegistry
     protected formatter: MetricsFormatter
     protected server: FastifyInstance
@@ -97,31 +118,24 @@ export class MetricsServer extends EventEmitter {
         this.port = port || 9090
 
         this.server.addHook('onRequest', async (request) => {
-            this.emit('request', {
-                request
-            })
+            this.emit('request', request)
         })
 
-        this.server.addHook('onError', async (request,_, error) => {
-            this.emit('error', {
-                request,
-                error
-            })
+        this.server.addHook('onError', async (request, __, error) => {
+            this.emit('error', new ServerError(error.message, {cause: error, request}))
         })
 
         this.server.addHook('onResponse', async (request, reply) => {
-            this.emit('response', {
-                request,
-                response: reply
-            })
+            this.emit('response', reply)
             // "As a rule of thumb, exposition SHOULD take no more than a second."
             if (reply.elapsedTime > 1000) {
                 this.emit(
                     'warning',
-                    new Error(
+                    new ServerError(
                         'Response too slow following OpenMetrics specs. Expected <= 1000ms, given '
-                        + reply.elapsedTime.toString()
-                        + 'ms'
+                        + (reply.elapsedTime > 1001 ? Math.floor(reply.elapsedTime) : Math.ceil(reply.elapsedTime)).toString()
+                        + 'ms',
+                        { request }
                     )
                 )
             }
