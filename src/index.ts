@@ -1,158 +1,114 @@
-/*
-* Guide https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md
-*/
-import {
-    Counter, CounterConfiguration, Gauge, GaugeConfiguration, Histogram, HistogramConfiguration,
-    Metric, Registry as PromRegistry, Summary, SummaryConfiguration, openMetricsContentType
-} from 'prom-client'
-import Fastify, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import EventEmitter from 'events'
 import { TypedEmitter } from 'tiny-typed-emitter'
 
-export type CounterOpts = Omit<CounterConfiguration<any>, 'registers' | 'aggregator'>
-export type GaugeOpts = Omit<GaugeConfiguration<any>, 'registers' | 'aggregator'>
-export type HistogramOpts = Omit<HistogramConfiguration<any>, 'registers' | 'aggregator'>
-export type SummaryOpts = Omit<SummaryConfiguration<any>, 'registers' | 'aggregator'>
+export interface MetricOpts {
+    name: string
+    description: string
+    tags: Record<string, string>
+}
 
-export class MetricsUserFriendlyInterface {
-    protected registry: MetricsRegistry
+export type MetricEvents = {
+    change: (value: number) => void
+}
 
-    public constructor(registry: MetricsRegistry) {
-        this.registry = registry
+export abstract class Metric extends (EventEmitter as new () => TypedEmitter<MetricEvents>) {
+    protected name: string
+    protected abstract type: string
+    protected description: string
+    protected tags: Record<string, string>
+
+    public constructor({name, description, tags}: MetricOpts) {
+        super()
+        this.name = name
+        this.description = description
+        this.tags = tags
     }
 
-    public createCounter(configuration: CounterOpts) {
-        return this.register(
-            new Counter({...configuration, registers: []})
-        )
+    public getName() {
+        return this.name
     }
 
-    public createGauge(configuration: GaugeOpts) {
-        return this.register(
-            new Gauge({...configuration, registers: []})
-        )
+    public getType() {
+        return this.type
     }
 
-    public createHistogram(configuration: HistogramOpts) {
-        return this.register(
-            new Histogram({...configuration, registers: []})
-        )
+    public getTags() {
+        return this.tags
     }
 
-    public createSummary(configuration: SummaryOpts) {
-        return this.register(
-            new Summary({...configuration, registers: []})
-        )
+    public getDescription() {
+        return this.description
     }
 
-    protected register<M extends Metric>(metric: M): M {
-        this.registry.register(metric)
+    public async collect() {
+        // this.emit('collect') with async
+    }
 
+    public onCollect(fn: () => Promise<void>) {
+        this.collect = fn
+    }
+}
+
+export interface CounterOpts extends MetricOpts {}
+
+export class Counter extends Metric {
+    type = 'counter'
+    public increment(value?: number) {
+        this.emit('change', value ?? 1)
+    }
+}
+
+export interface GaugeOpts extends MetricOpts {}
+
+export class Gauge extends Metric {
+    type = 'gauge'
+    public set(value: number) {
+        this.emit('change', value)
+    }
+}
+
+type MetricHandlerEvents = {
+    collect: (promises: Promise<void>[]) => void
+}
+
+export interface MetricHandler extends TypedEmitter<MetricHandlerEvents> {
+    handleMetricChange(metric: Metric, value: number): void
+}
+
+export class Metrics {
+    protected metrics: Metric[] = []
+    protected handlers: MetricHandler[]
+
+    public constructor({handlers}: {handlers: MetricHandler[]}) {
+        this.handlers = handlers
+
+        this.handlers.forEach(handler => {
+            handler.on('collect', (promises) => {
+                promises.push((async () => {
+                    await Promise.all(this.metrics.map(metric => metric.collect()))
+                })())
+            })
+        })
+    }
+
+    public createCounter(opts: CounterOpts): Counter {
+        return this.register(new Counter(opts))
+    }
+
+    public createGauge(opts: GaugeOpts): Gauge {
+        return this.register(new Gauge(opts))
+    }
+
+    protected register<T extends Metric>(metric: T): T {
+        if (this.metrics.find(m => m.getName() === metric.getName())) {
+            throw new Error('Metric with same name already registered')
+        }
+        this.metrics.push(metric)
+        metric.on('change', (value) => this.dispatchChange(metric, value))
         return metric
     }
 
-    // public child/scope (prefix) => Sub Class of MetricsRegistry without all methods and targetting same promRegistry ?
-}
-
-export class MetricsRegistry {
-    protected promRegistry = new PromRegistry
-
-    public register(metric: Metric) {
-        this.promRegistry.registerMetric(metric)
-    }
-}
-
-export class MetricsFormatter {
-    public getContentType() {
-        return openMetricsContentType
-    }
-
-    public async format(registry: MetricsRegistry) {
-        // Bad arch : Registry and dumper should not be the same
-        const promRegistry = registry['promRegistry']
-        // Cool ... Typescript is pooply implemented
-        promRegistry.setContentType(this.getContentType() as any)
-
-        return await promRegistry.metrics()
-    }
-}
-
-export type MetricsServerEvents = {
-    warning: (error: MetricsServerError) => void
-    error: (error: MetricsServerError) => void
-    request: (request: FastifyRequest) => void
-    response: (response: FastifyReply) => void
-}
-
-export interface MetricsServerErrorDetails {
-    request: FastifyRequest
-}
-
-export class MetricsServerError extends Error {
-    name = 'ServerError'
-    request: FastifyRequest
-    constructor(message: string, options: ErrorOptions & MetricsServerErrorDetails) {
-        super(message, {cause: options.cause})
-        this.request = options.request
-    }
-}
-
-export class MetricsServer extends (EventEmitter as new () => TypedEmitter<MetricsServerEvents>) {
-    protected registry: MetricsRegistry
-    protected formatter: MetricsFormatter
-    protected server: FastifyInstance
-    protected port: number
-
-    //public on(eventName: 'request', listener: (...args: any[]) => void): this
-
-    public constructor(
-        {registry, uidGenerator, formatter, port}:
-        {registry: MetricsRegistry, formatter: MetricsFormatter, uidGenerator?: () => string, port?: number}
-    ) {
-        super()
-        this.registry = registry
-        this.formatter = formatter
-        this.server = Fastify({
-            genReqId: uidGenerator || (() => Math.random().toString(36).substring(2))
-        })
-        this.port = port || 9090
-
-        this.server.addHook('onRequest', async (request) => {
-            this.emit('request', request)
-        })
-
-        this.server.addHook('onError', async (request, __, error) => {
-            this.emit('error', new MetricsServerError(error.message, {cause: error, request}))
-        })
-
-        this.server.addHook('onResponse', async (request, reply) => {
-            this.emit('response', reply)
-            // "As a rule of thumb, exposition SHOULD take no more than a second."
-            if (reply.elapsedTime > 1000) {
-                this.emit(
-                    'warning',
-                    new MetricsServerError(
-                        'Response too slow following OpenMetrics specs. Expected <= 1000ms, given '
-                        + (reply.elapsedTime > 1001 ? Math.floor(reply.elapsedTime) : Math.ceil(reply.elapsedTime)).toString()
-                        + 'ms',
-                        { request }
-                    )
-                )
-            }
-        })
-        this.server.get('/metrics', async (_, reply) => reply.type(this.formatter.getContentType()).send(await this.formatter.format(this.registry)))
-    }
-
-    public async start(abortSignal?: AbortSignal) {
-        // Warn listening can probably be false even if start has been called. To fix
-        if (this.server.server.listening) {
-            throw new Error('Server already running')
-        }
-
-        await this.server.listen({port: this.port, signal: abortSignal})
-    }
-
-    public async stop() {
-        await this.server.close()
+    protected dispatchChange(metric: Metric, value: number) {
+        this.handlers.forEach(handler => handler.handleMetricChange(metric, value))
     }
 }
