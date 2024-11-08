@@ -5,8 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "rm -Rf dist && tsc",
-    "test": "npm run build && npx c8 --all --src 'src' --exclude '*/*test*' --report-dir=/tmp/nyc mocha 'dist/*test*.js'",
-    "deploy": "npm run test && rm dist/*test* && npm login && trap 'npm logout' EXIT && release-it --no-git.requireCleanWorkingDir"
+    "test": "npm run build && npx c8 --all --src 'src' --exclude '*/*test*' --report-dir=/tmp/nyc mocha 'dist/test/*test*.js'",
+    "deploy": "npm run test && rm -R dist/test && npm login && trap 'npm logout' EXIT && release-it --no-git.requireCleanWorkingDir"
   },
   "type": "module",
   "author": "",
@@ -32,7 +32,6 @@
   "dependencies": {
     "fastify": "^5.0.0",
     "hot-shots": "^10.2.1",
-    "prom-client": "^15.1.3",
-    "tiny-typed-emitter": "^2.1.0"
+    "prom-client": "^15.1.3"
   }
 }

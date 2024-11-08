@@ -3,4 +3,4 @@
   <p align="center"><strong>Gallolabs Metrics</strong></p>
 </p>
 
-An Metrics component
+A Metrics component, unified frontend and plugable backend (pull/push, StatsD/Prometheus/...)

@@ -4,12 +4,19 @@
 import {
     Counter, Gauge, Registry as PromRegistry, openMetricsContentType
 } from 'prom-client'
-import {MetricHandler, Metric} from './index.js'
 import Fastify, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import EventEmitter from 'events'
-import { TypedEmitter } from 'tiny-typed-emitter'
+import { BaseHandler } from './handler.js'
+import { Metric } from './metrics.js'
 
-export class OpenMetricsHandler extends (EventEmitter as new () => TypedEmitter<OpenMetricsHandlerEvents>) implements MetricHandler  {
+export type MetricsServerEvents = {
+    warning: [MetricsServerError]
+    error: [MetricsServerError]
+    request: [FastifyRequest]
+    response: [FastifyReply]
+}
+
+
+export class OpenMetricsHandler extends BaseHandler<MetricsServerEvents> {
 	protected registry = new PromRegistry()
     protected server: FastifyInstance
     protected port: number
@@ -63,27 +70,33 @@ export class OpenMetricsHandler extends (EventEmitter as new () => TypedEmitter<
         await this.server.close()
     }
 
-    public handleMetricChange(metric: Metric, value: number): void {
-    	let promMetric = this.registry.getSingleMetric(metric.getName())
+    public register(metric: Metric): void {
+        super.register(metric)
 
-    	if (!promMetric) {
-    		switch(metric.getType()) {
-    			case 'counter':
-    				promMetric = new Counter({
-    					name: metric.getName(),
-    					help: metric.getDescription()
-    				})
-    				this.registry.registerMetric(promMetric)
-				case 'gauge':
-					promMetric = new Gauge({
-						name: metric.getName(),
-    					help: metric.getDescription()
-					})
-    				this.registry.registerMetric(promMetric)
-				default:
-					throw new Error('Unhandled metric type')
-    		}
-    	}
+        let promMetric = this.registry.getSingleMetric(metric.getName())
+
+        if (!promMetric) {
+            switch(metric.getType()) {
+                case 'counter':
+                    promMetric = new Counter({
+                        name: metric.getName(),
+                        help: metric.getDescription()
+                    })
+                    this.registry.registerMetric(promMetric)
+                case 'gauge':
+                    promMetric = new Gauge({
+                        name: metric.getName(),
+                        help: metric.getDescription()
+                    })
+                    this.registry.registerMetric(promMetric)
+                default:
+                    throw new Error('Unhandled metric type')
+            }
+        }
+    }
+
+    public handleUpdate(metric: Metric, value: number): void {
+        const promMetric = this.registry.getSingleMetric(metric.getName())
 
     	switch(metric.getType()) {
 			case 'counter':
@@ -106,24 +119,8 @@ export class OpenMetricsHandler extends (EventEmitter as new () => TypedEmitter<
 
         return await this.registry.metrics()
     }
-
-    protected async collect() {
-        const promises: Promise<void>[] = []
-        this.emit('collect', promises)
-        await Promise.all(promises)
-    }
 }
 
-export type MetricsServerEvents = {
-    warning: (error: MetricsServerError) => void
-    error: (error: MetricsServerError) => void
-    request: (request: FastifyRequest) => void
-    response: (response: FastifyReply) => void
-}
-
-export type OpenMetricsHandlerEvents = MetricsServerEvents & {
-    collect: (promises: Promise<void>[]) => void
-}
 
 export interface MetricsServerErrorDetails {
     request: FastifyRequest
