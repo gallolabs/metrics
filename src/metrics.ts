@@ -61,23 +61,49 @@ export abstract class Metric  {
 export interface CounterOpts extends MetricOpts {}
 
 export class Counter extends Metric {
-    public increment(value?: number) {
-        this.handler.handleUpdate(this, value ?? 1)
+    public increment(value?: number, tags?: Tags) {
+        if (tags) {
+            this.withTags(tags).increment(value)
+        } else {
+            this.handler.handleUpdate(this, value ?? 1)
+        }
     }
 
     public getType(): string {
         return 'counter'
+    }
+
+    public withTags(tags: Tags) {
+        return new Counter({
+            name: this.name,
+            description: this.description,
+            tags: {...this.tags, ...tags},
+            handler: this.handler
+        })
     }
 }
 
 export interface GaugeOpts extends MetricOpts {}
 
 export class Gauge extends Metric {
-    public set(value: number) {
-        this.handler.handleUpdate(this, value)
+    public set(value: number, tags?: Tags) {
+        if (tags) {
+            this.withTags(tags).set(value)
+        } else {
+            this.handler.handleUpdate(this, value)
+        }
     }
 
     public getType(): string {
         return 'gauge'
+    }
+
+    public withTags(tags: Tags) {
+        return new Gauge({
+            name: this.name,
+            description: this.description,
+            tags: {...this.tags, ...tags},
+            handler: this.handler
+        })
     }
 }

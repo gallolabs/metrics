@@ -11,21 +11,20 @@ export class MetricsBuilder {
         this.handler = handler
     }
 
-//    public createCounter(name: string, description: string, tags: Tags)
-    public createCounter(opts: Omit<CounterOpts, 'handler'>): Counter {
+    public counter(opts: Omit<CounterOpts, 'handler' | 'tags'>): Counter {
         return new Counter({
             ...opts,
             name: [this.namespace, opts.name].filter(Boolean).join('.'),
-            tags: {...this.tags, ...opts.tags},
+            tags: {...this.tags/*, ...opts.tags*/},
             handler: this.handler
         })
     }
 
-    public createGauge(opts: Omit<GaugeOpts, 'handler'>): Gauge {
+    public gauge(opts: Omit<GaugeOpts, 'handler' | 'tags'>): Gauge {
         return new Gauge({
             ...opts,
             name: [this.namespace, opts.name].filter(Boolean).join('.'),
-            tags: {...this.tags, ...opts.tags},
+            tags: {...this.tags/*, ...opts.tags*/},
             handler: this.handler
         })
     }

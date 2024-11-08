@@ -7,6 +7,7 @@ import {
 import Fastify, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { BaseHandler } from './handler.js'
 import { Metric } from './metrics.js'
+import {uniq} from 'lodash-es'
 
 export type MetricsServerEvents = {
     warning: [MetricsServerError]
@@ -74,7 +75,6 @@ export class OpenMetricsHandler extends BaseHandler<MetricsServerEvents> {
         super.register(metric)
 
         let promMetric = this.registry.getSingleMetric(this.convertName(metric.getName()))
-
         if (!promMetric) {
             switch(metric.getType()) {
                 case 'counter':
@@ -96,6 +96,9 @@ export class OpenMetricsHandler extends BaseHandler<MetricsServerEvents> {
                 default:
                     throw new Error('Unhandled metric type ' + metric.getType())
             }
+        } else {
+            (promMetric as any).labelNames = uniq((promMetric as any).labelNames.concat(Object.keys(metric.getTags()))).sort()
+            ;(promMetric as any).sortedLabelNames = (promMetric as any).labelNames.sort()
         }
     }
 
@@ -104,7 +107,7 @@ export class OpenMetricsHandler extends BaseHandler<MetricsServerEvents> {
 
     	switch(metric.getType()) {
 			case 'counter':
-				(promMetric as Counter).inc(value)
+				(promMetric as Counter).inc(metric.getTags(), value)
                 break
 			case 'gauge':
 				(promMetric as Gauge).set(metric.getTags(), value)

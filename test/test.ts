@@ -3,7 +3,7 @@ import { Gauge, MetricsBuilder, OpenMetricsHandler, StatsdHandler } from '../src
 import {setTimeout} from 'timers/promises'
 import net from 'net'
 
-describe('open-metric', () => {
+describe('metrics', () => {
     it('open metrics', async () => {
         const handler = new OpenMetricsHandler
         const builder = new MetricsBuilder({handler})
@@ -11,7 +11,7 @@ describe('open-metric', () => {
         const abortController = new AbortController
         await handler.startServer(abortController.signal)
 
-        const counter = builder.createCounter({
+        const counter = builder.counter({
             name: 'job.success',
             description: 'Job total success'
         })
@@ -42,13 +42,12 @@ job_success_total 1
 `
         )
 
-        const billingBuilder = builder.child('host', { host: '172.0.0.1' })
+        const hostMetricsBuilder = builder.child('host', { host: '172.0.0.1' })
 
-        billingBuilder.createGauge({
+        hostMetricsBuilder.gauge({
             name: 'cpu',
-            description: 'CPU measurement',
-            tags: { measureMethod: 'good' }
-        }).set(77)
+            description: 'CPU measurement'
+        }).withTags({ measureMethod: 'good' }).set(77)
 
         const v3 = await fetch('http://localhost:9090/metrics')
 
@@ -84,11 +83,10 @@ host_cpu{host="172.0.0.1",measureMethod="good"} 77
         const handler = new StatsdHandler({collectInterval: 500})
         const builder = new MetricsBuilder({handler})
 
-        const counter = builder.createCounter({
+        const counter = builder.counter({
             name: 'job.success',
             description: 'Job total success',
-            tags: {jobType: 'wall'}
-        })
+        }).withTags({jobType: 'wall'})
 
         counter.increment()
 
@@ -99,13 +97,13 @@ host_cpu{host="172.0.0.1",measureMethod="good"} 77
 
         received = []
 
-        builder.createGauge({
+        builder.gauge({
             name: 'cpu',
             description: 'CPU load',
             onCollect(gauge) {
                 (gauge as Gauge).set(78)
             }
-        })
+        }).withTags({machin: 'truc'})
 
 
         handler.startCollect(abortController.signal)

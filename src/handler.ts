@@ -9,9 +9,9 @@ export abstract class BaseHandler<T extends Record<keyof T, any[]>> extends Even
             throw new Error('Invalid two way handler set')
         }
 
-        if (this.metrics.find(m => m.getName() === metric.getName())) {
-            throw new Error('Metric with same name already registered')
-        }
+        // if (this.metrics.find(m => m.getName() === metric.getName())) {
+        //     throw new Error('Metric with same name already registered')
+        // }
 
         this.metrics.push(metric)
     }
