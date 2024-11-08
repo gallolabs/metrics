@@ -1,6 +1,7 @@
 import assert from 'assert'
-import { MetricsBuilder, OpenMetricsHandler } from '../src/index.js'
-//import {setTimeout} from 'timers/promises'
+import { Gauge, MetricsBuilder, OpenMetricsHandler, StatsdHandler } from '../src/index.js'
+import {setTimeout} from 'timers/promises'
+import net from 'net'
 
 describe('open-metric', () => {
     it('open metrics', async () => {
@@ -64,6 +65,62 @@ host_cpu{host="172.0.0.1",measureMethod="good"} 77
 `
         )
 
+        abortController.abort()
+    })
+
+    it('Statsd', async () => {
+        let received: string[] = []
+        const abortController = new AbortController
+
+        const s = net.createServer(function(socket) {
+            abortController.signal.addEventListener('abort', () => socket.end())
+            socket.on('data', (data) => {
+                received.push(data.toString())
+            })
+        });
+
+        s.listen(8125)
+
+        const handler = new StatsdHandler({collectInterval: 500})
+        const builder = new MetricsBuilder({handler})
+
+        const counter = builder.createCounter({
+            name: 'job.success',
+            description: 'Job total success',
+            tags: {jobType: 'wall'}
+        })
+
+        counter.increment()
+
+        await setTimeout(200)
+
+        assert.strictEqual(received.length, 1)
+        assert.strictEqual(received[0], 'job.success:1|c|#jobType:wall\n')
+
+        received = []
+
+        builder.createGauge({
+            name: 'cpu',
+            description: 'CPU load',
+            onCollect(gauge) {
+                (gauge as Gauge).set(78)
+            }
+        })
+
+
+        handler.startCollect(abortController.signal)
+
+        await setTimeout(300)
+        assert.strictEqual(received.length, 0)
+
+        await setTimeout(300)
+
+        assert.strictEqual(received.length, 1)
+        assert.strictEqual(received[0], 'cpu:78|g\n')
+
+        received = []
+
+        s.close()
         abortController.abort()
     })
 })

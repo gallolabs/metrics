@@ -10,7 +10,7 @@ export interface MetricOpts {
     description: string
     tags?: Tags
     handler: Handler
-    onCollect?: () => Promise<void>
+    onCollect?: (self: Metric) => Promise<void> | void
 }
 
 export abstract class Metric  {
@@ -53,8 +53,8 @@ export abstract class Metric  {
     public async collect() {
     }
 
-    public onCollect(fn: () => Promise<void>) {
-        this.collect = fn
+    public onCollect(fn: (self: Metric) => Promise<void> | void) {
+        this.collect = async () => fn(this)
     }
 }
 

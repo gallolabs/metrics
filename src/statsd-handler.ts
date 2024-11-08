@@ -4,10 +4,16 @@ import {BaseHandler} from './handler.js'
 
 export class StatsdHandler extends BaseHandler<{}> {
     protected statsd
+    protected collectInterval: number
 
-    public constructor() {
+    public constructor({collectInterval}: {collectInterval?: number} = {}) {
         super()
-        this.statsd = new StatsD
+        this.collectInterval = collectInterval || 10000
+        this.statsd = new StatsD({
+            protocol: 'tcp'
+
+        })
+        //this.statsd.close()
     }
 
     public handleUpdate(metric: Metric, value: number): void {
@@ -24,7 +30,7 @@ export class StatsdHandler extends BaseHandler<{}> {
     }
 
     public startCollect(abortSignal: AbortSignal) {
-        const e = setInterval(() => this.collect(), 10000)
+        const e = setInterval(() => this.collect(), this.collectInterval)
         abortSignal.addEventListener('abort', () => clearInterval(e))
     }
 
