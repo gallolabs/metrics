@@ -23,7 +23,7 @@ export class OpenMetricsHandler extends BaseHandler<MetricsServerEvents> {
 
     public constructor(
         {uidGenerator, port}:
-        {uidGenerator?: () => string, port?: number}
+        {uidGenerator?: () => string, port?: number} = {}
     ) {
         super()
         this.server = Fastify({
@@ -73,45 +73,55 @@ export class OpenMetricsHandler extends BaseHandler<MetricsServerEvents> {
     public register(metric: Metric): void {
         super.register(metric)
 
-        let promMetric = this.registry.getSingleMetric(metric.getName())
+        let promMetric = this.registry.getSingleMetric(this.convertName(metric.getName()))
 
         if (!promMetric) {
             switch(metric.getType()) {
                 case 'counter':
                     promMetric = new Counter({
-                        name: metric.getName(),
-                        help: metric.getDescription()
+                        name: this.convertName(metric.getName()),
+                        help: metric.getDescription(),
+                        labelNames: Object.keys(metric.getTags())
                     })
                     this.registry.registerMetric(promMetric)
+                    break
                 case 'gauge':
                     promMetric = new Gauge({
-                        name: metric.getName(),
-                        help: metric.getDescription()
+                        name: this.convertName(metric.getName()),
+                        help: metric.getDescription(),
+                        labelNames: Object.keys(metric.getTags())
                     })
                     this.registry.registerMetric(promMetric)
+                    break
                 default:
-                    throw new Error('Unhandled metric type')
+                    throw new Error('Unhandled metric type ' + metric.getType())
             }
         }
     }
 
     public handleUpdate(metric: Metric, value: number): void {
-        const promMetric = this.registry.getSingleMetric(metric.getName())
+        const promMetric = this.registry.getSingleMetric(this.convertName(metric.getName()))
 
     	switch(metric.getType()) {
 			case 'counter':
 				(promMetric as Counter).inc(value)
+                break
 			case 'gauge':
 				(promMetric as Gauge).set(metric.getTags(), value)
+                break
 		}
 
+    }
+
+    protected convertName(name: string) {
+        return name.replace(/\./g, '_')
     }
 
     protected getContentType() {
         return openMetricsContentType
     }
 
-    protected async format() {
+    public async format() {
         // Cool ... Typescript is pooply implemented
         this.registry.setContentType(this.getContentType() as any)
 

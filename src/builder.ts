@@ -11,7 +11,8 @@ export class MetricsBuilder {
         this.handler = handler
     }
 
-    public createCounter(opts: CounterOpts): Counter {
+//    public createCounter(name: string, description: string, tags: Tags)
+    public createCounter(opts: Omit<CounterOpts, 'handler'>): Counter {
         return new Counter({
             ...opts,
             name: [this.namespace, opts.name].filter(Boolean).join('.'),
@@ -20,7 +21,7 @@ export class MetricsBuilder {
         })
     }
 
-    public createGauge(opts: GaugeOpts): Gauge {
+    public createGauge(opts: Omit<GaugeOpts, 'handler'>): Gauge {
         return new Gauge({
             ...opts,
             name: [this.namespace, opts.name].filter(Boolean).join('.'),

@@ -8,14 +8,13 @@ export interface Handler {
 export interface MetricOpts {
     name: string
     description: string
-    tags: Tags
+    tags?: Tags
     handler: Handler
-    onCollect: () => Promise<void>
+    onCollect?: () => Promise<void>
 }
 
 export abstract class Metric  {
     protected name: string
-    protected abstract type: string
     protected description: string
     protected tags: Record<string, string>
     protected handler: Handler
@@ -23,7 +22,7 @@ export abstract class Metric  {
     public constructor({name, description, tags, handler, onCollect}: MetricOpts) {
         this.name = name
         this.description = description
-        this.tags = tags
+        this.tags = tags || {}
         this.handler = handler
 
         handler.register(this)
@@ -37,9 +36,7 @@ export abstract class Metric  {
         return this.name
     }
 
-    public getType() {
-        return this.type
-    }
+    public abstract getType(): string
 
     public getTags() {
         return this.tags
@@ -64,17 +61,23 @@ export abstract class Metric  {
 export interface CounterOpts extends MetricOpts {}
 
 export class Counter extends Metric {
-    type = 'counter'
     public increment(value?: number) {
         this.handler.handleUpdate(this, value ?? 1)
+    }
+
+    public getType(): string {
+        return 'counter'
     }
 }
 
 export interface GaugeOpts extends MetricOpts {}
 
 export class Gauge extends Metric {
-    type = 'gauge'
     public set(value: number) {
         this.handler.handleUpdate(this, value)
+    }
+
+    public getType(): string {
+        return 'gauge'
     }
 }

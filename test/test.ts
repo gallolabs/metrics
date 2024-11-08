@@ -1,92 +1,69 @@
 import assert from 'assert'
-import {MetricsRegistry, MetricsUserFriendlyInterface, MetricsServer, MetricsFormatter} from './index.js'
-import {setTimeout} from 'timers/promises'
+import { MetricsBuilder, OpenMetricsHandler } from '../src/index.js'
+//import {setTimeout} from 'timers/promises'
 
 describe('open-metric', () => {
-    it('test', async() => {
-
-        const metricsRegistry = new MetricsRegistry
-        const metrics = new MetricsUserFriendlyInterface(metricsRegistry)
-        const metricsServer = new MetricsServer({
-            formatter: new MetricsFormatter,
-            registry: metricsRegistry
-        })
-
-        metricsServer.on('request', (request) => {
-            console.log('Received request', request.id, request.url)
-        })
-
-        metricsServer.on('response', (response) => {
-            console.log('Returned response', response.request.id)
-        })
-
-        metricsServer.on('error', (error) => {
-            console.log('Errorrr !!!', error)
-        })
-
-        metricsServer.on('warning', (warning) => {
-            console.log('Warning !', warning.message, warning.request.id)
-        })
+    it('open metrics', async () => {
+        const handler = new OpenMetricsHandler
+        const builder = new MetricsBuilder({handler})
 
         const abortController = new AbortController
-        await metricsServer.start(abortController.signal)
+        await handler.startServer(abortController.signal)
 
-        const tickCounter = metrics.createCounter({
-            help: 'Number of called interval',
-            name: 'called_count'
+        const counter = builder.createCounter({
+            name: 'job.success',
+            description: 'Job total success'
         })
 
-        const randoms = [44, 88, 22, 99]
-        let randomI = 0
+        const v1 = await fetch('http://localhost:9090/metrics')
 
-        metrics.createGauge({
-            help: 'Random value',
-            name: 'random',
-            async collect() {
-                if (randomI === 1) {
-                    await setTimeout(1000)
-                }
-                this.set(randoms[randomI++])
-            }
-        })
-
-        const httpInputHistogram = metrics.createHistogram({
-            help: 'Input Http Requests',
-            name: 'input_http',
-            buckets: [40, 100, 500]
-        })
-
-        tickCounter.inc()
-        httpInputHistogram.observe(150)
-        tickCounter.inc()
-        httpInputHistogram.observe(32)
-
-        await fetch('http://localhost:9090/metrics')
-        const v = await fetch('http://localhost:9090/metrics')
-
-        abortController.abort()
-
-        assert.strictEqual(v.headers.get('content-type'), 'application/openmetrics-text; version=1.0.0; charset=utf-8')
-
+        assert.strictEqual(v1.headers.get('content-type'), 'application/openmetrics-text; version=1.0.0; charset=utf-8')
         assert.strictEqual(
-            await v.text(),
-`# HELP called_count Number of called interval
-# TYPE called_count counter
-called_count_total 2
-# HELP random Random value
-# TYPE random gauge
-random 88
-# HELP input_http Input Http Requests
-# TYPE input_http histogram
-input_http_bucket{le="40"} 1
-input_http_bucket{le="100"} 1
-input_http_bucket{le="500"} 2
-input_http_bucket{le="+Inf"} 2
-input_http_sum 182
-input_http_count 2
+            await v1.text(),
+`# HELP job_success Job total success
+# TYPE job_success counter
+job_success_total 0
 # EOF
 `
         )
 
+        counter.increment()
+
+        const v2 = await fetch('http://localhost:9090/metrics')
+
+        assert.strictEqual(v2.headers.get('content-type'), 'application/openmetrics-text; version=1.0.0; charset=utf-8')
+        assert.strictEqual(
+            await v2.text(),
+`# HELP job_success Job total success
+# TYPE job_success counter
+job_success_total 1
+# EOF
+`
+        )
+
+        const billingBuilder = builder.child('host', { host: '172.0.0.1' })
+
+        billingBuilder.createGauge({
+            name: 'cpu',
+            description: 'CPU measurement',
+            tags: { measureMethod: 'good' }
+        }).set(77)
+
+        const v3 = await fetch('http://localhost:9090/metrics')
+
+        assert.strictEqual(v3.headers.get('content-type'), 'application/openmetrics-text; version=1.0.0; charset=utf-8')
+        assert.strictEqual(
+            await v3.text(),
+`# HELP job_success Job total success
+# TYPE job_success counter
+job_success_total 1
+# HELP host_cpu CPU measurement
+# TYPE host_cpu gauge
+host_cpu{host="172.0.0.1",measureMethod="good"} 77
+# EOF
+`
+        )
+
+        abortController.abort()
     })
 })
