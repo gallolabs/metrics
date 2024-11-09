@@ -16,6 +16,19 @@ describe('metrics', () => {
             description: 'Job total success'
         })
 
+        const v0 = await fetch('http://localhost:9090/metrics')
+
+        assert.strictEqual(v0.headers.get('content-type'), 'application/openmetrics-text; version=1.0.0; charset=utf-8')
+        assert.strictEqual(
+            await v0.text(),
+`# HELP job_success Job total success
+# TYPE job_success counter
+# EOF
+`
+        )
+
+        counter.increment(0)
+
         const v1 = await fetch('http://localhost:9090/metrics')
 
         assert.strictEqual(v1.headers.get('content-type'), 'application/openmetrics-text; version=1.0.0; charset=utf-8')
@@ -46,7 +59,7 @@ job_success_total 1
 
         hostMetricsBuilder.gauge({
             name: 'cpu',
-            description: 'CPU measurement'
+            description: 'CPU measurement',
         }).withTags({ measureMethod: 'good' }).set(77)
 
         const v3 = await fetch('http://localhost:9090/metrics')
@@ -83,7 +96,7 @@ host_cpu{host="172.0.0.1",measureMethod="good"} 77
         const handler = new StatsdHandler({collectInterval: 500})
         const builder = new MetricsBuilder({handler})
 
-        const counter = builder.counter({
+        const counter = builder.child('app', {appId: '24'}).counter({
             name: 'job.success',
             description: 'Job total success',
         }).withTags({jobType: 'wall'})
@@ -93,7 +106,7 @@ host_cpu{host="172.0.0.1",measureMethod="good"} 77
         await setTimeout(200)
 
         assert.strictEqual(received.length, 1)
-        assert.strictEqual(received[0], 'job.success:1|c|#jobType:wall\n')
+        assert.strictEqual(received[0], 'app.job.success:1|c|#appId:24,jobType:wall\n')
 
         received = []
 

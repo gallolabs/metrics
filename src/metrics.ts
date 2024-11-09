@@ -103,7 +103,7 @@ export class Gauge extends Metric {
             name: this.name,
             description: this.description,
             tags: {...this.tags, ...tags},
-            handler: this.handler
+            handler: this.handler,
         })
     }
 }

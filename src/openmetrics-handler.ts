@@ -81,7 +81,8 @@ export class OpenMetricsHandler extends BaseHandler<MetricsServerEvents> {
                     promMetric = new Counter({
                         name: this.convertName(metric.getName()),
                         help: metric.getDescription(),
-                        labelNames: Object.keys(metric.getTags())
+                        labelNames: Object.keys(metric.getTags()).length === 0 ? ['abc'] : Object.keys(metric.getTags()),
+                        registers: []
                     })
                     this.registry.registerMetric(promMetric)
                     break
@@ -89,7 +90,8 @@ export class OpenMetricsHandler extends BaseHandler<MetricsServerEvents> {
                     promMetric = new Gauge({
                         name: this.convertName(metric.getName()),
                         help: metric.getDescription(),
-                        labelNames: Object.keys(metric.getTags())
+                        labelNames: Object.keys(metric.getTags()).length === 0 ? ['abc'] : Object.keys(metric.getTags()),
+                        registers: []
                     })
                     this.registry.registerMetric(promMetric)
                     break
