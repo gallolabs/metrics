@@ -93,7 +93,12 @@ host_cpu{host="172.0.0.1",measureMethod="good"} 77
 
         s.listen(8125)
 
-        const handler = new StatsdHandler({collectInterval: 500})
+        const handler = new StatsdHandler({
+            collectInterval: 500,
+            rewrites: {
+                'job.status': 'job.status.${status}'
+            }
+        })
         const builder = new MetricsBuilder({handler})
 
         const counter = builder.child('app', {appId: '24'}).counter({
@@ -107,6 +112,18 @@ host_cpu{host="172.0.0.1",measureMethod="good"} 77
 
         assert.strictEqual(received.length, 1)
         assert.strictEqual(received[0], 'app.job.success:1|c|#appId:24,jobType:wall\n')
+
+        received = []
+
+        builder.counter({
+            name: 'job.status',
+            description: 'Job status'
+        }).withTags({status: 'success'}).increment()
+
+        await setTimeout(200)
+
+        assert.strictEqual(received.length, 1)
+        assert.strictEqual(received[0], 'job.status.success:1|c\n')
 
         received = []
 
