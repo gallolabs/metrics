@@ -81,6 +81,7 @@ This is just a POC ! A lot of things are to be done (errors handling, etc)
 - Integrate OpenMetrics
 - Integrate StatsD
 - Integrate generic UDP/TCP/HTTP
+- Metric name as array to escape
 
 Configure StatsD with performance
 ```
