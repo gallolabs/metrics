@@ -9,7 +9,7 @@ export interface MetricOpts {
     name: string
     description: string
     tags?: Tags
-    handler: Handler
+    handlers: Handler[]
     onCollect?: (self: Metric) => Promise<void> | void
 }
 
@@ -17,15 +17,15 @@ export abstract class Metric  {
     protected name: string
     protected description: string
     protected tags: Record<string, string>
-    protected handler: Handler
+    protected handlers: Handler[]
 
-    public constructor({name, description, tags, handler, onCollect}: MetricOpts) {
+    public constructor({name, description, tags, handlers, onCollect}: MetricOpts) {
         this.name = name
         this.description = description
         this.tags = tags || {}
-        this.handler = handler
+        this.handlers = handlers
 
-        handler.register(this)
+        handlers.forEach(handler => handler.register(this))
 
         if (onCollect) {
             this.onCollect(onCollect)
@@ -46,8 +46,8 @@ export abstract class Metric  {
         return this.description
     }
 
-    public getHandler() {
-        return this.handler
+    public getHandlers() {
+        return this.handlers
     }
 
     public async collect() {
@@ -65,7 +65,7 @@ export class Counter extends Metric {
         if (tags) {
             this.withTags(tags).increment(value)
         } else {
-            this.handler.handleUpdate(this, value ?? 1)
+            this.handlers.forEach(handler => handler.handleUpdate(this, value ?? 1))
         }
     }
 
@@ -78,7 +78,7 @@ export class Counter extends Metric {
             name: this.name,
             description: this.description,
             tags: {...this.tags, ...tags},
-            handler: this.handler
+            handlers: this.handlers
         })
     }
 }
@@ -90,7 +90,7 @@ export class Gauge extends Metric {
         if (tags) {
             this.withTags(tags).set(value)
         } else {
-            this.handler.handleUpdate(this, value)
+            this.handlers.forEach(handler => handler.handleUpdate(this, value))
         }
     }
 
@@ -103,7 +103,7 @@ export class Gauge extends Metric {
             name: this.name,
             description: this.description,
             tags: {...this.tags, ...tags},
-            handler: this.handler,
+            handlers: this.handlers,
         })
     }
 }

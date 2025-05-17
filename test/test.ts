@@ -4,9 +4,33 @@ import {setTimeout} from 'timers/promises'
 import net from 'net'
 
 describe('metrics', () => {
+    it('multi handlers', async() => {
+        const handler1 = new OpenMetricsHandler({port: 4000})
+        const handler2 = new OpenMetricsHandler({port: 5000})
+        const builder = new MetricsBuilder({handlers: [handler1, handler2]})
+
+        const abortController = new AbortController
+        await handler1.startServer(abortController.signal)
+        await handler2.startServer(abortController.signal)
+
+        const counter = builder.counter({
+            name: 'job.success',
+            description: 'Job total success'
+        })
+
+        counter.increment()
+
+        const v1a = await fetch('http://localhost:4000/metrics')
+        const v1b = await fetch('http://localhost:4000/metrics')
+
+        abortController.abort()
+
+        assert.strictEqual(await v1a.text(), await v1b.text())
+    })
+
     it('open metrics', async () => {
         const handler = new OpenMetricsHandler
-        const builder = new MetricsBuilder({handler})
+        const builder = new MetricsBuilder({handlers: [handler]})
 
         const abortController = new AbortController
         await handler.startServer(abortController.signal)
@@ -99,7 +123,7 @@ host_cpu{host="172.0.0.1",measureMethod="good"} 77
                 'job.status': 'job.status.${status}'
             }
         })
-        const builder = new MetricsBuilder({handler})
+        const builder = new MetricsBuilder({handlers: [handler]})
 
         const counter = builder.child('app', {appId: '24'}).counter({
             name: 'job.success',

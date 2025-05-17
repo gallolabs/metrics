@@ -5,7 +5,7 @@ export abstract class BaseHandler<T extends Record<keyof T, any[]>> extends Even
     protected metrics: Metric[] = []
 
     public register(metric: Metric) {
-        if (metric.getHandler() !== this) {
+        if (!metric.getHandlers().includes(this)) {
             throw new Error('Invalid two way handler set')
         }
 
@@ -24,13 +24,6 @@ export abstract class BaseHandler<T extends Record<keyof T, any[]>> extends Even
         )
     }
 }
-
-
-
-// export class MultiHandler extends Handler {
-
-// }
-
 
 // export class MetricsRootHandler {
 //     protected metrics: Metric[] = []
