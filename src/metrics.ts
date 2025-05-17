@@ -6,7 +6,7 @@ export interface Handler {
 }
 
 export interface MetricOpts {
-    name: string
+    name: string[]
     description: string
     tags?: Tags
     handlers: Handler[]
@@ -14,7 +14,7 @@ export interface MetricOpts {
 }
 
 export abstract class Metric  {
-    protected name: string
+    protected name: string[]
     protected description: string
     protected tags: Record<string, string>
     protected handlers: Handler[]

@@ -16,7 +16,6 @@ export type MetricsServerEvents = {
     response: [FastifyReply]
 }
 
-
 export class OpenMetricsHandler extends BaseHandler<MetricsServerEvents> {
 	protected registry = new PromRegistry()
     protected server: FastifyInstance
@@ -118,8 +117,8 @@ export class OpenMetricsHandler extends BaseHandler<MetricsServerEvents> {
 
     }
 
-    protected convertName(name: string) {
-        return name.replace(/\./g, '_')
+    protected convertName(name: string[]) {
+        return name.map(part => part.replace(/_/g, '_')).join('_')
     }
 
     protected getContentType() {

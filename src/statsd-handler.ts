@@ -21,7 +21,7 @@ export class StatsdHandler extends BaseHandler<{}> {
     }
 
     public handleUpdate(metric: Metric, value: number): void {
-        let name = metric.getName()
+        let name = metric.getName().map(part => part.replace(/\.|:/g, '-')).join('.')
         let tags = metric.getTags()
 
         if (this.rewrites[name]) {
@@ -45,5 +45,4 @@ export class StatsdHandler extends BaseHandler<{}> {
         const e = setInterval(() => this.collect(), this.collectInterval)
         abortSignal.addEventListener('abort', () => clearInterval(e))
     }
-
 }
