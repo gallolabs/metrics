@@ -5,18 +5,38 @@ import {template} from 'lodash-es'
 
 export type StatsDNoTagsRewrites = Record<string, string>
 
-export class StatsdHandler extends BaseHandler<{}> {
+export interface StatsdHandlerOpts {
+    collectInterval?: number,
+    rewrites?: StatsDNoTagsRewrites
+    protocol?: 'tcp' | 'udp'
+    host?: string
+    port?: number
+    cacheDnsTtl?: number
+    bufferMaxSize?: number
+    bufferFlushInterval?: number
+}
+
+export class StatsdHandler extends BaseHandler<{error: [Error]}> {
     protected statsd
     protected collectInterval: number
     protected rewrites: StatsDNoTagsRewrites
 
-    public constructor({collectInterval, rewrites}: {collectInterval?: number, rewrites?: StatsDNoTagsRewrites} = {}) {
+    public constructor(opts: StatsdHandlerOpts = {}) {
         super()
-        this.collectInterval = collectInterval || 10000
+        this.collectInterval = opts.collectInterval || 10000
         this.statsd = new StatsD({
-            protocol: 'tcp'
+            protocol: opts.protocol || 'tcp',
+            host: opts.host,
+            port: opts.port,
+            errorHandler: (error: Error) => {
+                this.emit('error', error)
+            },
+            cacheDns: opts.cacheDnsTtl === 0 ? false : true,
+            cacheDnsTtl: opts.cacheDnsTtl ?? 30000,
+            maxBufferSize: opts.bufferMaxSize || 512, // UDP 65507, STATSD 512 ?
+            bufferFlushInterval: opts.bufferFlushInterval || 1000
         })
-        this.rewrites = rewrites || {}
+        this.rewrites = opts.rewrites || {}
         //this.statsd.close()
     }
 

@@ -76,25 +76,3 @@ metricBuilder can be scoped in namespaced metric name and tags. Here callpartner
 ## But ...
 
 This is just a POC ! A lot of things are to be done (errors handling, etc)
-
-## Todo
-- Integrate OpenMetrics
-- Integrate StatsD
-- Integrate generic UDP/TCP/HTTP
-- Metric name as array to escape
-
-Configure StatsD with performance
-```
-new StatsD({
-            host: opts.server.host,
-            port: opts.server.port,
-            protocol: opts.server.protocol,
-            errorHandler: (error: Error) => {
-                logger.error('StatsD error', {error})
-            },
-            cacheDns: opts.buffering?.cacheDnsTtl === 0 ? false : true,
-            cacheDnsTtl: opts.buffering?.cacheDnsTtl ?? 30000,
-            maxBufferSize: opts.buffering?.bufferMaxSize || 512, // UDP 65507, STATSD 512 ?
-            bufferFlushInterval: opts.buffering?.flushInterval || 1000
-        })
-```

@@ -132,7 +132,7 @@ host_cpu{host="172.0.0.1",measureMethod="good"} 77
 
         counter.increment()
 
-        await setTimeout(200)
+        await setTimeout(1200)
 
         assert.strictEqual(received.length, 1)
         assert.strictEqual(received[0], 'app.job.success:1|c|#appId:24,jobType:wall\n')
@@ -144,7 +144,7 @@ host_cpu{host="172.0.0.1",measureMethod="good"} 77
             description: 'Job status'
         }).withTags({status: 'success'}).increment()
 
-        await setTimeout(200)
+        await setTimeout(1200)
 
         assert.strictEqual(received.length, 1)
         assert.strictEqual(received[0], 'job.status.success:1|c\n')
@@ -165,14 +165,15 @@ host_cpu{host="172.0.0.1",measureMethod="good"} 77
         await setTimeout(300)
         assert.strictEqual(received.length, 0)
 
-        await setTimeout(300)
+        await setTimeout(1300)
+        abortController.abort()
 
-        assert.strictEqual(received.length, 1)
+        assert.strictEqual(received.length, 2)
         assert.strictEqual(received[0], 'cpu:78|g\n')
+        assert.strictEqual(received[1], 'cpu:78|g\ncpu:78|g\n')
 
         received = []
 
         s.close()
-        abortController.abort()
-    })
+    }).timeout(5000)
 })
